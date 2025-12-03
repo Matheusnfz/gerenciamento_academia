@@ -1,53 +1,81 @@
 import React, { useState, useEffect } from "react";
+import api from "../services/api";
 
 function Alunos() {
   const [alunos, setAlunos] = useState([]);
-  const [nome, setNome] = useState("");
-  const [email, setEmail] = useState("");
-  const [planoSelecionado, setPlanoSelecionado] = useState("");
   const [planos, setPlanos] = useState([]);
 
+  const [nome, setNome] = useState("");
+  const [email, setEmail] = useState("");
+  const [cpf, setCpf] = useState("");
+  const [planoId, setPlanoId] = useState("");
+
+  // Carregar alunos e planos do backend
   useEffect(() => {
-    const alunosSalvos = JSON.parse(localStorage.getItem("alunos")) || [];
-    const planosSalvos = JSON.parse(localStorage.getItem("planos")) || [];
-    setAlunos(alunosSalvos);
-    setPlanos(planosSalvos);
+    carregarAlunos();
+    carregarPlanos();
   }, []);
 
-  useEffect(() => {
-    localStorage.setItem("alunos", JSON.stringify(alunos));
-  }, [alunos]);
+  async function carregarAlunos() {
+    try {
+      const resposta = await api.get("/alunos");
+      setAlunos(resposta.data);
+    } catch (err) {
+      console.log("Erro ao carregar alunos:", err);
+    }
+  }
 
-  const adicionarAluno = (e) => {
+  async function carregarPlanos() {
+    try {
+      const resposta = await api.get("/planos");
+      setPlanos(resposta.data);
+    } catch (err) {
+      console.log("Erro ao carregar planos:", err);
+    }
+  }
+
+  async function adicionarAluno(e) {
     e.preventDefault();
 
-    if (!nome || !email || !planoSelecionado) {
+    if (!nome || !email || !cpf || !planoId) {
       alert("Preencha todos os campos!");
       return;
     }
 
-    const planoEscolhido = planos.find((p) => p.nome === planoSelecionado);
+    try {
+      await api.post("/alunos", {
+        nome,
+        email,
+        cpf,
+        plano: planoId,
+      });
 
-    const novoAluno = {
-      id: Date.now(),
-      nome,
-      email,
-      plano: planoEscolhido.nome,
-      valor: planoEscolhido.valor,
-    };
+      setNome("");
+      setEmail("");
+      setCpf("");
+      setPlanoId("");
 
-    setAlunos([...alunos, novoAluno]);
-    setNome("");
-    setEmail("");
-    setPlanoSelecionado("");
-  };
+      carregarAlunos();
+    } catch (err) {
+      console.log("Erro:", err);
+      alert("Erro ao cadastrar aluno");
+    }
+  }
 
-  const removerAluno = (id) => {
-    const listaAtualizada = alunos.filter((a) => a.id !== id);
-    setAlunos(listaAtualizada);
-  };
+  async function removerAluno(id) {
+    if (!window.confirm("Deseja excluir este aluno?")) return;
 
-  const totalPago = alunos.reduce((acc, aluno) => acc + Number(aluno.valor || 0), 0);
+    try {
+      await api.delete(`/alunos/${id}`);
+      carregarAlunos();
+    } catch (err) {
+      console.log("Erro ao remover aluno:", err);
+    }
+  }
+
+  const totalPago = alunos.reduce((acc, aluno) => {
+    return acc + (aluno.plano?.preco || 0);
+  }, 0);
 
   return (
     <div className="tela-alunos">
@@ -62,27 +90,37 @@ function Alunos() {
               value={nome}
               onChange={(e) => setNome(e.target.value)}
             />
+
             <input
               type="email"
               placeholder="Email do aluno"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
+
+            <input
+              type="text"
+              placeholder="CPF"
+              value={cpf}
+              onChange={(e) => setCpf(e.target.value)}
+            />
+
             <select
-              value={planoSelecionado}
-              onChange={(e) => setPlanoSelecionado(e.target.value)}
+              value={planoId}
+              onChange={(e) => setPlanoId(e.target.value)}
             >
               <option value="">Selecione um plano</option>
               {planos.length === 0 ? (
                 <option disabled>Nenhum plano cadastrado</option>
               ) : (
                 planos.map((plano) => (
-                  <option key={plano.id} value={plano.nome}>
-                    {plano.nome} — R$ {plano.valor}
+                  <option key={plano._id} value={plano._id}>
+                    {plano.nome} — R$ {plano.preco}
                   </option>
                 ))
               )}
             </select>
+
             <button type="submit" className="btn-azul">
               Adicionar
             </button>
@@ -91,21 +129,27 @@ function Alunos() {
 
         <div className="caixa-lista">
           <h2 className="subtitulo">Lista de Alunos</h2>
+
           <ul className="lista-alunos">
             {alunos.length === 0 ? (
               <p className="vazio">Nenhum aluno cadastrado.</p>
             ) : (
               alunos.map((aluno) => (
-                <li key={aluno.id} className="card-aluno">
+                <li key={aluno._id} className="card-aluno">
                   <div className="info-aluno">
                     <strong>{aluno.nome}</strong> <br />
                     <span>{aluno.email}</span> <br />
-                    Plano: <span className="plano">{aluno.plano}</span> —{" "}
-                    <span className="valor">R$ {aluno.valor}</span>
+                    CPF: {aluno.cpf} <br />
+                    Plano:{" "}
+                    <span className="plano">
+                      {aluno.plano?.nome || "Sem plano"}
+                    </span>{" "}
+                    — R$ {aluno.plano?.preco || 0}
                   </div>
+
                   <button
                     className="btn-excluir"
-                    onClick={() => removerAluno(aluno.id)}
+                    onClick={() => removerAluno(aluno._id)}
                   >
                     Excluir
                   </button>
@@ -115,7 +159,7 @@ function Alunos() {
           </ul>
 
           <div className="total">
-            💰 <strong>Total Pago:</strong> R$ {totalPago}
+            💰 <strong>Total Pago pelos Planos:</strong> R$ {totalPago}
           </div>
         </div>
       </div>

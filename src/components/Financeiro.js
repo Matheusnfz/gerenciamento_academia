@@ -1,20 +1,31 @@
 import React, { useState, useEffect } from "react";
+import api from "../services/api";
 
 function Financeiro() {
   const [transacoes, setTransacoes] = useState([]);
   const [descricao, setDescricao] = useState("");
   const [valor, setValor] = useState("");
 
+  // ==============================
+  //  CARREGAR TRANSAÇÕES DO BACKEND
+  // ==============================
   useEffect(() => {
-    const transacoesSalvas = JSON.parse(localStorage.getItem("financeiro")) || [];
-    setTransacoes(transacoesSalvas);
+    carregarTransacoes();
   }, []);
 
-  useEffect(() => {
-    localStorage.setItem("financeiro", JSON.stringify(transacoes));
-  }, [transacoes]);
+  async function carregarTransacoes() {
+    try {
+      const resposta = await api.get("/financeiro");
+      setTransacoes(resposta.data);
+    } catch (error) {
+      console.log("Erro ao carregar financeiro:", error);
+    }
+  }
 
-  const adicionarTransacao = (e) => {
+  // ==============================
+  //  ADICIONAR TRANSAÇÃO
+  // ==============================
+  async function adicionarTransacao(e) {
     e.preventDefault();
 
     if (!descricao || !valor) {
@@ -22,23 +33,40 @@ function Financeiro() {
       return;
     }
 
-    const novaTransacao = {
-      id: Date.now(),
-      descricao,
-      valor: parseFloat(valor),
-    };
+    try {
+      await api.post("/financeiro", {
+        descricao,
+        valor: Number(valor),
+      });
 
-    setTransacoes([...transacoes, novaTransacao]);
-    setDescricao("");
-    setValor("");
-  };
+      setDescricao("");
+      setValor("");
 
-  const removerTransacao = (id) => {
-    const listaAtualizada = transacoes.filter((t) => t.id !== id);
-    setTransacoes(listaAtualizada);
-  };
+      carregarTransacoes();
+    } catch (error) {
+      console.log("Erro ao adicionar transação:", error);
+      alert("Erro ao adicionar transação.");
+    }
+  }
 
-  const total = transacoes.reduce((acc, t) => acc + t.valor, 0);
+  // ==============================
+  //  REMOVER TRANSAÇÃO
+  // ==============================
+  async function removerTransacao(id) {
+    if (!window.confirm("Deseja excluir esta transação?")) return;
+
+    try {
+      await api.delete(`/financeiro/${id}`);
+      carregarTransacoes();
+    } catch (error) {
+      console.log("Erro ao remover:", error);
+    }
+  }
+
+  // ==============================
+  //  CALCULAR TOTAL
+  // ==============================
+  const total = transacoes.reduce((acc, t) => acc + Number(t.valor || 0), 0);
 
   return (
     <div className="main-content fade-in">
@@ -55,12 +83,14 @@ function Financeiro() {
             value={descricao}
             onChange={(e) => setDescricao(e.target.value)}
           />
+
           <input
             type="number"
             placeholder="Valor (R$)"
             value={valor}
             onChange={(e) => setValor(e.target.value)}
           />
+
           <button type="submit" className="btn-adicionar">Adicionar</button>
         </div>
       </form>
@@ -74,12 +104,16 @@ function Financeiro() {
           <p className="lista-vazia">Nenhuma transação cadastrada ainda.</p>
         ) : (
           transacoes.map((t) => (
-            <li key={t.id} className="card-item">
+            <li key={t._id} className="card-item">
               <div className="info">
                 <strong>{t.descricao}</strong>
-                <span>R$ {t.valor.toFixed(2)}</span>
+                <span>R$ {Number(t.valor).toFixed(2)}</span>
               </div>
-              <button onClick={() => removerTransacao(t.id)} className="btn-excluir">
+
+              <button
+                onClick={() => removerTransacao(t._id)}
+                className="btn-excluir"
+              >
                 Excluir
               </button>
             </li>

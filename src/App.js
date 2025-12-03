@@ -22,7 +22,7 @@ function App() {
       setUsuario("Instrutor");
     } else {
       alert("Usuário ou senha inválidos!");
-    }
+    } 
   };
 
   const handleLogout = () => {

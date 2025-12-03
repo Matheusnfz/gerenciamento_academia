@@ -1,11 +1,12 @@
 import React, { useState } from "react";
-import "../styles.css"; 
+import api from "../services/api";
+import "../styles.css";
 
-function Login({ onLogin }) {
+function Login() {
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
 
-  const handleSubmit = (e) => {
+  async function handleSubmit(e) {
     e.preventDefault();
 
     if (!email || !senha) {
@@ -13,16 +14,40 @@ function Login({ onLogin }) {
       return;
     }
 
-    onLogin(email, senha);
-  };
+    try {
+      const resposta = await api.post("/auth/login", {
+        email,
+        senha
+      });
+
+      const { token, user } = resposta.data;
+
+      localStorage.setItem("token", token);
+
+      localStorage.setItem("user", JSON.stringify(user));
+
+      alert("Login realizado com sucesso!");
+
+      window.location.href = "/home";
+
+    } catch (error) {
+      console.log("Erro no login:", error);
+
+      const msg =
+        error.response?.data?.mensagem ||
+        error.response?.data?.error ||
+        "Erro ao fazer login.";
+
+      alert(msg);
+    }
+  }
 
   return (
     <div className="login-page">
       <div className="login-box">
-      
+
         <h2 className="login-title">Academia Pro System</h2>
 
-       
         <form onSubmit={handleSubmit}>
           <label>Email:</label>
           <input
@@ -44,8 +69,7 @@ function Login({ onLogin }) {
         </form>
 
         <p className="login-info">
-          Teste: admin@academia.com / 1234 <br />
-          ou instrutor@academia.com / 1234
+          Teste: admin@academia.com / admin123 <br />
         </p>
       </div>
     </div>

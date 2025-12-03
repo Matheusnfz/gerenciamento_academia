@@ -6,15 +6,29 @@ function Planos() {
   const [valor, setValor] = useState("");
 
   useEffect(() => {
-    const planosSalvos = JSON.parse(localStorage.getItem("planos")) || [];
-    setPlanos(planosSalvos);
+    carregarPlanos();
   }, []);
 
-  useEffect(() => {
-    localStorage.setItem("planos", JSON.stringify(planos));
-  }, [planos]);
+  // Buscar planos do backend
+  async function carregarPlanos() {
+    const token = localStorage.getItem("token");
 
-  const adicionarPlano = (e) => {
+    try {
+      const resposta = await fetch("http://localhost:3000/planos", {
+        headers: {
+          "Authorization": "Bearer " + token
+        }
+      });
+
+      const dados = await resposta.json();
+      setPlanos(dados);
+    } catch (error) {
+      console.log("Erro ao carregar planos:", error);
+    }
+  }
+
+  // Adicionar plano no backend
+  async function adicionarPlano(e) {
     e.preventDefault();
 
     if (!nome || !valor) {
@@ -22,21 +36,57 @@ function Planos() {
       return;
     }
 
-    const novoPlano = {
-      id: Date.now(),
-      nome,
-      valor,
-    };
+    const token = localStorage.getItem("token");
 
-    setPlanos([...planos, novoPlano]);
-    setNome("");
-    setValor("");
-  };
+    try {
+      const resposta = await fetch("http://localhost:3000/planos", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + token
+        },
+        body: JSON.stringify({
+          nome,
+          valor: Number(valor),
+        }),
+      });
 
-  const removerPlano = (id) => {
-    const listaAtualizada = planos.filter((p) => p.id !== id);
-    setPlanos(listaAtualizada);
-  };
+      if (!resposta.ok) {
+        const erro = await resposta.json();
+        alert(erro.mensagem || "Erro ao cadastrar plano");
+        return;
+      }
+
+      setNome("");
+      setValor("");
+
+      carregarPlanos(); // atualizar lista
+
+    } catch (error) {
+      console.log("Erro ao adicionar plano:", error);
+    }
+  }
+
+  // Remover plano do backend
+  async function removerPlano(id) {
+    const token = localStorage.getItem("token");
+
+    if (!window.confirm("Deseja remover este plano?")) return;
+
+    try {
+      await fetch(`http://localhost:3000/planos/${id}`, {
+        method: "DELETE",
+        headers: {
+          "Authorization": "Bearer " + token
+        }
+      });
+
+      carregarPlanos(); // atualizar lista
+
+    } catch (error) {
+      console.log("Erro ao excluir plano:", error);
+    }
+  }
 
   return (
     <div className="main-content fade-in">
@@ -59,14 +109,18 @@ function Planos() {
       </form>
 
       <ul>
-        {planos.map((plano) => (
-          <li key={plano.id}>
-            <div>
-              <strong>{plano.nome}</strong> — R$ {plano.valor}
-            </div>
-            <button onClick={() => removerPlano(plano.id)}>Excluir</button>
-          </li>
-        ))}
+        {planos.length === 0 ? (
+          <p>Nenhum plano cadastrado.</p>
+        ) : (
+          planos.map((plano) => (
+            <li key={plano._id}>
+              <div>
+                <strong>{plano.nome}</strong> — R$ {plano.valor}
+              </div>
+              <button onClick={() => removerPlano(plano._id)}>Excluir</button>
+            </li>
+          ))
+        )}
       </ul>
     </div>
   );
